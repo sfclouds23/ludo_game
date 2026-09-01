@@ -1,30 +1,34 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:ludo_game/core/config/app_config.dart';
+import 'package:ludo_game/core/config/app_environment.dart';
 import 'package:ludo_game/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('displays development environment configuration', (
+    WidgetTester tester,
+  ) async {
+    // Create a known configuration explicitly so this test does not depend
+    // on command-line --dart-define values.
+    const AppConfig config = AppConfig(
+      environment: AppEnvironment.development,
+      apiBaseUrl: 'http://localhost:3000',
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Render the root Ludo application using our test configuration.
+    await tester.pumpWidget(
+      const LudoApp(config: config),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify that the selected environment is rendered.
+    expect(
+      find.text('Environment: development'),
+      findsOneWidget,
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify that the API URL comes from the supplied configuration.
+    expect(
+      find.text('API: http://localhost:3000'),
+      findsOneWidget,
+    );
   });
 }
