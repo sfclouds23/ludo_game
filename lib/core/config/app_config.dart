@@ -1,10 +1,7 @@
 import 'app_environment.dart';
 
 class AppConfig {
-  const AppConfig({
-    required this.environment,
-    required this.apiBaseUrl,
-  });
+  const AppConfig({required this.environment, required this.apiBaseUrl});
 
   final AppEnvironment environment;
   final String apiBaseUrl;

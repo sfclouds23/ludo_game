@@ -1,34 +1,29 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ludo_game/core/config/app_config.dart';
+import 'package:ludo_game/core/config/app_config_provider.dart';
 import 'package:ludo_game/core/config/app_environment.dart';
-import 'package:ludo_game/main.dart';
+import 'package:ludo_game/app/app.dart';
 
 void main() {
-  testWidgets('displays development environment configuration', (
+  testWidgets('loads home route with development configuration', (
     WidgetTester tester,
   ) async {
-    // Create a known configuration explicitly so this test does not depend
-    // on command-line --dart-define values.
     const AppConfig config = AppConfig(
       environment: AppEnvironment.development,
       apiBaseUrl: 'http://localhost:3000',
     );
 
-    // Render the root Ludo application using our test configuration.
     await tester.pumpWidget(
-      const LudoApp(config: config),
+      ProviderScope(
+        overrides: [appConfigProvider.overrideWithValue(config)],
+        child: const LudoApp(),
+      ),
     );
 
-    // Verify that the selected environment is rendered.
-    expect(
-      find.text('Environment: development'),
-      findsOneWidget,
-    );
+    expect(find.text('Environment: development'), findsOneWidget);
 
-    // Verify that the API URL comes from the supplied configuration.
-    expect(
-      find.text('API: http://localhost:3000'),
-      findsOneWidget,
-    );
+    expect(find.text('API: http://localhost:3000'), findsOneWidget);
+    expect(find.text('Ludo Home'), findsOneWidget);
   });
 }
