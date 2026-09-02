@@ -312,6 +312,33 @@ void main() {
     });
 
     group('complete movement paths', () {
+      test('maps player-relative progress 0 through 56 to correct path sections', () {
+        for (final playerColor in PlayerColor.values) {
+          final path = BoardDefinition.movementPathFor(playerColor);
+
+          // Progress 0 is the player's shared-track start position.
+          // A token still in the yard/base is represented separately and must not
+          // be confused with progress 0.
+          expect(path.cellAt(0).type, BoardCellType.mainPath);
+
+          // Progress 50 is the player's final shared-track position before the
+          // token enters its private home lane.
+          expect(path.cellAt(50).type, BoardCellType.mainPath);
+
+          // Progress 51 through 55 represents the five private home-lane cells.
+          for (int progress = 51; progress <= 55; progress++) {
+            expect(path.cellAt(progress).type, BoardCellType.homeLane);
+          }
+
+          // Progress 56 is the player's final logical finish position.
+          expect(path.cellAt(56).type, BoardCellType.finish);
+
+          // Progress outside the defined 0-56 movement range is invalid.
+          expect(() => path.cellAt(-1), throwsRangeError);
+
+          expect(() => path.cellAt(57), throwsRangeError);
+        }
+      });
       test('creates deterministic 57-position path for every player', () {
         for (final playerColor in PlayerColor.values) {
           final path = BoardDefinition.movementPathFor(playerColor);
