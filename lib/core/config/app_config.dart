@@ -12,25 +12,27 @@ class AppConfig {
       defaultValue: 'development',
     );
 
-    switch (environmentValue) {
-      case 'staging':
-        return const AppConfig(
-          environment: AppEnvironment.staging,
-          apiBaseUrl: 'https://staging-api.example.com',
-        );
+    final AppEnvironment environment = AppEnvironment.fromValue(
+      environmentValue,
+    );
 
-      case 'production':
-        return const AppConfig(
-          environment: AppEnvironment.production,
-          apiBaseUrl: 'https://api.example.com',
-        );
+    return forEnvironment(environment);
+  }
 
-      case 'development':
-      default:
-        return const AppConfig(
-          environment: AppEnvironment.development,
-          apiBaseUrl: 'http://localhost:3000',
-        );
-    }
+  static AppConfig forEnvironment(AppEnvironment environment) {
+    return switch (environment) {
+      AppEnvironment.development => const AppConfig(
+        environment: AppEnvironment.development,
+        apiBaseUrl: 'http://localhost:3000',
+      ),
+      AppEnvironment.staging => const AppConfig(
+        environment: AppEnvironment.staging,
+        apiBaseUrl: 'https://staging-api.example.com',
+      ),
+      AppEnvironment.production => const AppConfig(
+        environment: AppEnvironment.production,
+        apiBaseUrl: 'https://api.example.com',
+      ),
+    };
   }
 }
