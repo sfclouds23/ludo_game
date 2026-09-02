@@ -1,46 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/app.dart';
 import 'core/config/app_config.dart';
+import 'core/config/app_config_provider.dart';
 
 void main() {
   final AppConfig config = AppConfig.fromEnvironment();
 
   runApp(
-    LudoApp(config: config),
+    ProviderScope(
+      overrides: [appConfigProvider.overrideWithValue(config)],
+      child: const LudoApp(),
+    ),
   );
-}
-
-class LudoApp extends StatelessWidget {
-  const LudoApp({
-    required this.config,
-    super.key,
-  });
-
-  final AppConfig config;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Ludo'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Environment: ${config.environment.name}',
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'API: ${config.apiBaseUrl}',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
