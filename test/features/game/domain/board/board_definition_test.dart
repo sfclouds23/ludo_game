@@ -118,7 +118,7 @@ void main() {
         );
       });
 
-      test('translation wraps around the circular main track', () {
+      test('translation wraps around circular main track', () {
         expect(
           BoardDefinition.mainTrackCellAt(PlayerColor.blue, 13).id,
           'main_0',
@@ -146,17 +146,18 @@ void main() {
       );
     });
 
-    group('generated player paths', () {
-      test('creates a 52-cell main-track path for every player', () {
+    group('complete circular player views', () {
+      test('creates a 52-cell main-track view for every player', () {
         for (final playerColor in PlayerColor.values) {
           final path = BoardDefinition.mainTrackFor(playerColor);
 
           expect(path.playerColor, playerColor);
+
           expect(path.length, BoardDefinition.mainTrackCellCount);
         }
       });
 
-      test('each generated path starts at the player start cell', () {
+      test('each circular view starts at player start cell', () {
         expect(
           BoardDefinition.mainTrackFor(PlayerColor.red).cellAt(0).id,
           'main_0',
@@ -179,6 +180,269 @@ void main() {
       });
     });
 
+    group('home lanes', () {
+      test('creates five private home-lane cells for every player', () {
+        for (final playerColor in PlayerColor.values) {
+          final homeLane = BoardDefinition.homeLaneFor(playerColor);
+
+          expect(homeLane.length, BoardDefinition.homeLaneCellCount);
+
+          for (final cell in homeLane) {
+            expect(cell.type, BoardCellType.homeLane);
+          }
+        }
+      });
+
+      test('creates deterministic red home-lane identifiers', () {
+        final homeLane = BoardDefinition.homeLaneFor(PlayerColor.red);
+
+        expect(homeLane.first.id, 'red_home_lane_0');
+
+        expect(homeLane.last.id, 'red_home_lane_4');
+      });
+
+      test('keeps different player home lanes logically separate', () {
+        final redHomeLane = BoardDefinition.homeLaneFor(PlayerColor.red);
+
+        final greenHomeLane = BoardDefinition.homeLaneFor(PlayerColor.green);
+
+        expect(redHomeLane.first, isNot(greenHomeLane.first));
+
+        expect(redHomeLane.first.id, 'red_home_lane_0');
+
+        expect(greenHomeLane.first.id, 'green_home_lane_0');
+      });
+    });
+
+    group('finish cells', () {
+      test('creates one player-specific finish cell per color', () {
+        for (final playerColor in PlayerColor.values) {
+          final finish = BoardDefinition.finishCellFor(playerColor);
+
+          expect(finish.type, BoardCellType.finish);
+
+          expect(finish.id, '${playerColor.name}_finish');
+        }
+      });
+
+      test('different players do not share finish cells', () {
+        expect(
+          BoardDefinition.finishCellFor(PlayerColor.red),
+          isNot(BoardDefinition.finishCellFor(PlayerColor.green)),
+        );
+      });
+    });
+
+    group('safe cells', () {
+      test('contains all four player starting positions', () {
+        expect(
+          BoardDefinition.safeMainTrackIndices,
+          containsAll([0, 13, 26, 39]),
+        );
+      });
+
+      test('contains the four additional protected positions', () {
+        expect(
+          BoardDefinition.safeMainTrackIndices,
+          containsAll([8, 21, 34, 47]),
+        );
+      });
+
+      test('contains eight protected shared-track positions', () {
+        expect(BoardDefinition.safeMainTrackIndices.length, 8);
+      });
+
+      test('recognizes player starts as safe', () {
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[0]),
+          isTrue,
+        );
+
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[13]),
+          isTrue,
+        );
+
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[26]),
+          isTrue,
+        );
+
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[39]),
+          isTrue,
+        );
+      });
+
+      test('recognizes additional safe main-track cells', () {
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[8]),
+          isTrue,
+        );
+
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[21]),
+          isTrue,
+        );
+      });
+
+      test('recognizes ordinary shared-track cells as unsafe', () {
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[1]),
+          isFalse,
+        );
+
+        expect(
+          BoardDefinition.isSafeCell(BoardDefinition.mainTrackCells[12]),
+          isFalse,
+        );
+      });
+
+      test('treats private home-lane cells as safe', () {
+        final homeCell = BoardDefinition.homeLaneFor(PlayerColor.red).first;
+
+        expect(BoardDefinition.isSafeCell(homeCell), isTrue);
+      });
+
+      test('treats finish cells as safe', () {
+        final finishCell = BoardDefinition.finishCellFor(PlayerColor.red);
+
+        expect(BoardDefinition.isSafeCell(finishCell), isTrue);
+      });
+    });
+
+    group('complete movement paths', () {
+      test('creates deterministic 57-position path for every player', () {
+        for (final playerColor in PlayerColor.values) {
+          final path = BoardDefinition.movementPathFor(playerColor);
+
+          expect(path.playerColor, playerColor);
+
+          expect(path.length, BoardDefinition.playerPathCellCount);
+
+          expect(path.length, 57);
+        }
+      });
+
+      test('every movement path begins at that player start cell', () {
+        expect(
+          BoardDefinition.movementPathFor(PlayerColor.red).cellAt(0).id,
+          'main_0',
+        );
+
+        expect(
+          BoardDefinition.movementPathFor(PlayerColor.green).cellAt(0).id,
+          'main_13',
+        );
+
+        expect(
+          BoardDefinition.movementPathFor(PlayerColor.yellow).cellAt(0).id,
+          'main_26',
+        );
+
+        expect(
+          BoardDefinition.movementPathFor(PlayerColor.blue).cellAt(0).id,
+          'main_39',
+        );
+      });
+
+      test('shared movement section contains exactly 51 cells', () {
+        final path = BoardDefinition.movementPathFor(PlayerColor.red);
+
+        for (
+          int index = 0;
+          index < BoardDefinition.playerMainTrackCellCount;
+          index++
+        ) {
+          expect(path.cellAt(index).type, BoardCellType.mainPath);
+        }
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount).type,
+          BoardCellType.homeLane,
+        );
+      });
+
+      test('red enters its private home lane after main_50', () {
+        final path = BoardDefinition.movementPathFor(PlayerColor.red);
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount - 1).id,
+          'main_50',
+        );
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount).id,
+          'red_home_lane_0',
+        );
+      });
+
+      test('green enters its private home lane after main_11', () {
+        final path = BoardDefinition.movementPathFor(PlayerColor.green);
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount - 1).id,
+          'main_11',
+        );
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount).id,
+          'green_home_lane_0',
+        );
+      });
+
+      test('yellow enters its private home lane after main_24', () {
+        final path = BoardDefinition.movementPathFor(PlayerColor.yellow);
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount - 1).id,
+          'main_24',
+        );
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount).id,
+          'yellow_home_lane_0',
+        );
+      });
+
+      test('blue enters its private home lane after main_37', () {
+        final path = BoardDefinition.movementPathFor(PlayerColor.blue);
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount - 1).id,
+          'main_37',
+        );
+
+        expect(
+          path.cellAt(BoardDefinition.playerMainTrackCellCount).id,
+          'blue_home_lane_0',
+        );
+      });
+
+      test('every movement path ends at player finish cell', () {
+        for (final playerColor in PlayerColor.values) {
+          final path = BoardDefinition.movementPathFor(playerColor);
+
+          expect(
+            path.cellAt(path.length - 1),
+            BoardDefinition.finishCellFor(playerColor),
+          );
+        }
+      });
+
+      test('player path never loops back onto own start cell', () {
+        for (final playerColor in PlayerColor.values) {
+          final path = BoardDefinition.movementPathFor(playerColor);
+
+          final startCell = path.cellAt(0);
+
+          final remainingCells = path.cells.skip(1);
+
+          expect(remainingCells, isNot(contains(startCell)));
+        }
+      });
+    });
+
     group('invalid progress', () {
       test('rejects negative main-track progress', () {
         expect(
@@ -187,7 +451,7 @@ void main() {
         );
       });
 
-      test('rejects progress beyond the shared main track', () {
+      test('rejects progress beyond complete shared track', () {
         expect(
           () => BoardDefinition.mainTrackCellAt(
             PlayerColor.red,
