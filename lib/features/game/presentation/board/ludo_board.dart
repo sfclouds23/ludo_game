@@ -5,15 +5,21 @@ import 'package:flutter/material.dart';
 import '../../domain/models/token.dart';
 import 'ludo_board_painter.dart';
 import 'ludo_token_layer.dart';
+import 'ludo_token_visual_state.dart';
 
 /// Displays the production Ludo board at a responsive square size.
 ///
 /// Static board drawing and dynamic token rendering use separate repaint
 /// boundaries so token changes do not continuously repaint the board artwork.
+///
+/// The board forwards caller-supplied token presentation and interaction data.
+/// It does not calculate legal moves, captures, blockades, or dice outcomes.
 class LudoBoard extends StatelessWidget {
   /// Creates a responsive Ludo board.
   const LudoBoard({
     this.tokens = const [],
+    this.visualStates = const {},
+    this.onTokenPressed,
     this.maximumDimension = 720,
     super.key,
   }) : assert(
@@ -28,6 +34,18 @@ class LudoBoard extends StatelessWidget {
 
   /// Immutable logical tokens displayed above the board.
   final List<Token> tokens;
+
+  /// Presentation-only state associated with each token ID.
+  ///
+  /// The owning application or game-state layer determines these values.
+  /// Tokens without an entry are displayed using the idle visual state.
+  final Map<String, LudoTokenVisualState> visualStates;
+
+  /// Optional callback invoked with the stable ID of a pressed token.
+  ///
+  /// The board forwards this callback to the token layer without deciding
+  /// whether the token represents a legal move.
+  final ValueChanged<String>? onTokenPressed;
 
   /// Maximum board width and height on large tablet and web layouts.
   final double maximumDimension;
@@ -61,14 +79,20 @@ class LudoBoard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // The static board remains isolated from token updates.
+                // Static board artwork remains isolated from token animation
+                // and interaction-state changes.
                 const RepaintBoundary(
                   key: repaintBoundaryKey,
                   child: CustomPaint(painter: LudoBoardPainter()),
                 ),
 
-                // Tokens occupy a separate widget and repaint hierarchy.
-                LudoTokenLayer(tokens: tokens),
+                // Dynamic tokens occupy their own widget and repaint hierarchy.
+                // The board only forwards state selected by its caller.
+                LudoTokenLayer(
+                  tokens: tokens,
+                  visualStates: visualStates,
+                  onTokenPressed: onTokenPressed,
+                ),
               ],
             ),
           ),
