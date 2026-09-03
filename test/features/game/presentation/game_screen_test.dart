@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ludo_game/features/game/domain/models/dice_result.dart';
 import 'package:ludo_game/features/game/domain/models/player_color.dart';
+import 'package:ludo_game/features/game/domain/services/dice_roller.dart';
 import 'package:ludo_game/features/game/presentation/board/ludo_board.dart';
 import 'package:ludo_game/features/game/presentation/board/ludo_token.dart';
 import 'package:ludo_game/features/game/presentation/board/ludo_token_visual_state.dart';
+import 'package:ludo_game/features/game/presentation/dice/ludo_dice.dart';
+import 'package:ludo_game/features/game/presentation/dice/ludo_dice_painter.dart';
 import 'package:ludo_game/features/game/presentation/game_screen.dart';
 
 void main() {
@@ -23,28 +27,24 @@ void main() {
         ),
         hasLength(3),
       );
-
       expect(
         GameScreen.previewTokens.where(
           (token) => token.ownerColor == PlayerColor.green,
         ),
         hasLength(2),
       );
-
       expect(
         GameScreen.previewTokens.where(
           (token) => token.ownerColor == PlayerColor.yellow,
         ),
         hasLength(2),
       );
-
       expect(
         GameScreen.previewTokens.where(
           (token) => token.ownerColor == PlayerColor.blue,
         ),
         hasLength(2),
       );
-
       expect(GameScreen.previewTokens, hasLength(9));
     });
 
@@ -63,7 +63,7 @@ void main() {
       expect(() => GameScreen.previewTokens.clear(), throwsUnsupportedError);
     });
 
-    test('declares visual state without calculating legal moves', () {
+    test('declares token visual state without calculating legal moves', () {
       expect(
         GameScreen.previewVisualStates['red_token_1'],
         const LudoTokenVisualState(isMovable: true),
@@ -95,12 +95,8 @@ void main() {
 
       expect(board.visualStates['red_token_1']?.isMovable, isTrue);
       expect(board.visualStates['red_token_1']?.isSelected, isFalse);
-
-      // The preview begins with the second stacked red token selected so its
-      // selection treatment and z-order can be visually inspected.
       expect(board.visualStates['red_token_2']?.isMovable, isTrue);
       expect(board.visualStates['red_token_2']?.isSelected, isTrue);
-
       expect(board.visualStates['yellow_token_1']?.isMoving, isTrue);
     });
 
@@ -134,8 +130,6 @@ void main() {
       final board = tester.widget<LudoBoard>(find.byType(LudoBoard));
       final selectedState = board.visualStates['blue_token_0'];
 
-      // Selecting an idle token proves this preview does not infer legality
-      // from the movable flag. It only reflects which token was pressed.
       expect(selectedState?.isMovable, isFalse);
       expect(selectedState?.isSelected, isTrue);
     });
@@ -147,4 +141,165 @@ void main() {
       expect(find.byTooltip('Return home'), findsOneWidget);
     });
   });
+
+  group('GameScreen dice sequencing', () {
+    testWidgets('renders the dice with its initial logical result', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+
+      expect(find.byType(LudoDice), findsOneWidget);
+
+      final dice = tester.widget<LudoDice>(find.byType(LudoDice));
+      final painter =
+          tester
+                  .widget<CustomPaint>(
+                    find.descendant(
+                      of: find.byType(LudoDice),
+                      matching: find.byType(CustomPaint),
+                    ),
+                  )
+                  .painter
+              as LudoDicePainter;
+
+      expect(dice.result, DiceResult(1));
+      expect(dice.isRolling, isFalse);
+      expect(dice.isEnabled, isTrue);
+      expect(painter.result, DiceResult(1));
+    });
+
+    testWidgets('generates the logical result before starting animation', (
+      tester,
+    ) async {
+      final roller = _FakeDiceRoller([DiceResult(5)]);
+
+      await tester.pumpWidget(
+        MaterialApp(home: GameScreen(diceRoller: roller)),
+      );
+
+      await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
+      await tester.pump();
+
+      final dice = tester.widget<LudoDice>(find.byType(LudoDice));
+
+      expect(roller.rollCount, 1);
+      expect(dice.result, DiceResult(5));
+      expect(dice.isRolling, isTrue);
+      expect(dice.isEnabled, isFalse);
+    });
+
+    testWidgets('does not generate another result during animation', (
+      tester,
+    ) async {
+      final roller = _FakeDiceRoller([DiceResult(4), DiceResult(6)]);
+
+      await tester.pumpWidget(
+        MaterialApp(home: GameScreen(diceRoller: roller)),
+      );
+
+      await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
+      await tester.pump();
+
+      final rollingDice = tester.widget<LudoDice>(find.byType(LudoDice));
+
+      expect(rollingDice.isRolling, isTrue);
+      expect(rollingDice.onRollRequested, isNotNull);
+
+      // Calling the screen callback again simulates a duplicate external
+      // request while animation is active.
+      rollingDice.onRollRequested!();
+      await tester.pump();
+
+      expect(roller.rollCount, 1);
+      expect(
+        tester.widget<LudoDice>(find.byType(LudoDice)).result,
+        DiceResult(4),
+      );
+    });
+
+    testWidgets('publishes the same result after animation completion', (
+      tester,
+    ) async {
+      final logicalResult = DiceResult(6);
+      final roller = _FakeDiceRoller([logicalResult]);
+      DiceResult? readyResult;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameScreen(
+            diceRoller: roller,
+            onDiceResultReady: (result) {
+              readyResult = result;
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
+      await tester.pump();
+
+      expect(readyResult, isNull);
+
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump();
+
+      final dice = tester.widget<LudoDice>(find.byType(LudoDice));
+
+      expect(readyResult, same(logicalResult));
+      expect(dice.result, same(logicalResult));
+      expect(dice.isRolling, isFalse);
+      expect(dice.isEnabled, isTrue);
+    });
+
+    testWidgets('supports consecutive independent logical rolls', (
+      tester,
+    ) async {
+      final firstResult = DiceResult(2);
+      final secondResult = DiceResult(5);
+      final roller = _FakeDiceRoller([firstResult, secondResult]);
+      final completedResults = <DiceResult>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameScreen(
+            diceRoller: roller,
+            onDiceResultReady: completedResults.add,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump();
+
+      await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump();
+
+      expect(roller.rollCount, 2);
+      expect(completedResults, [firstResult, secondResult]);
+    });
+  });
+}
+
+/// Deterministic logical roller used independently from dice animation.
+class _FakeDiceRoller implements DiceRoller {
+  _FakeDiceRoller(this._results);
+
+  final List<DiceResult> _results;
+  int rollCount = 0;
+
+  @override
+  DiceResult roll() {
+    if (rollCount >= _results.length) {
+      throw StateError('No fake dice result remains.');
+    }
+
+    final result = _results[rollCount];
+    rollCount++;
+
+    return result;
+  }
 }
