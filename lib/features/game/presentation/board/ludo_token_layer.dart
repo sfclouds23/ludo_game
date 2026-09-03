@@ -4,16 +4,22 @@ import '../../domain/models/player_color.dart';
 import '../../domain/models/token.dart';
 import 'board_geometry.dart';
 import 'ludo_token.dart';
+import 'ludo_token_visual_state.dart';
 import 'token_coordinate_mapper.dart';
 
 /// Positions dynamic Ludo tokens above the static board.
 ///
 /// This layer reads immutable token state and converts it into presentation
-/// coordinates. It does not perform moves, captures, dice calculations, or
-/// other game-engine operations.
+/// coordinates. It displays caller-supplied selectability and forwards token
+/// presses, but never determines legal moves, captures, or dice outcomes.
 class LudoTokenLayer extends StatelessWidget {
   /// Creates a token overlay for [tokens].
-  const LudoTokenLayer({required this.tokens, super.key});
+  const LudoTokenLayer({
+    required this.tokens,
+    this.visualStates = const {},
+    this.onTokenPressed,
+    super.key,
+  });
 
   /// Key identifying the repaint boundary around the complete token layer.
   static const Key repaintBoundaryKey = ValueKey<String>(
@@ -22,6 +28,19 @@ class LudoTokenLayer extends StatelessWidget {
 
   /// Immutable logical tokens currently displayed on the board.
   final List<Token> tokens;
+
+  /// Presentation-only state associated with each token ID.
+  ///
+  /// Tokens without an entry use [LudoTokenVisualState.idle]. The caller is
+  /// responsible for deciding which tokens are movable or selected.
+  final Map<String, LudoTokenVisualState> visualStates;
+
+  /// Optional callback invoked with the pressed token's stable ID.
+  ///
+  /// This layer does not inspect [LudoTokenVisualState.isMovable] before
+  /// forwarding the press. Legal-move enforcement belongs to the authoritative
+  /// application or game-state layer.
+  final ValueChanged<String>? onTokenPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +93,8 @@ class LudoTokenLayer extends StatelessWidget {
       yardSlotIndex: yardSlotIndex,
     );
 
+    final visualState = visualStates[token.id] ?? LudoTokenVisualState.idle;
+
     return Positioned(
       key: ValueKey<String>('ludo-token-position-${token.id}'),
       left: center.dx - tokenDimension / 2,
@@ -84,6 +105,14 @@ class LudoTokenLayer extends StatelessWidget {
         tokenId: token.id,
         playerColor: token.ownerColor,
         dimension: tokenDimension,
+        visualState: visualState,
+        isInYard: token.position.isInYard,
+        isFinished: token.position.isFinished,
+        onPressed: onTokenPressed == null
+            ? null
+            : () {
+                onTokenPressed!(token.id);
+              },
       ),
     );
   }
