@@ -25,7 +25,9 @@ class TokenMovementService {
   /// token's currently legal options for the completed dice result. No state is
   /// mutated when the move is rejected.
   TokenMoveTransaction? tryCommit(GameState state, LegalMove move) {
-    final tokenIndex = state.tokens.indexWhere((token) => token.id == move.tokenId);
+    final tokenIndex = state.tokens.indexWhere(
+      (token) => token.id == move.tokenId,
+    );
     if (tokenIndex < 0) {
       return null;
     }

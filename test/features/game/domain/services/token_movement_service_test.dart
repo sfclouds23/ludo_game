@@ -54,10 +54,12 @@ void main() {
 
       final transaction = movementService.tryCommit(state, move)!;
 
-      expect(
-        transaction.steps.map((position) => position.progress),
-        [50, 51, 52, 53],
-      );
+      expect(transaction.steps.map((position) => position.progress), [
+        50,
+        51,
+        52,
+        53,
+      ]);
       expect(transaction.steps[1].isInHomeLane, isTrue);
       expect(_token(transaction.gameState, 'red_0').position.progress, 53);
     });
@@ -70,12 +72,17 @@ void main() {
 
       final transaction = movementService.tryCommit(state, move)!;
 
-      expect(
-        transaction.steps.map((position) => position.progress),
-        [53, 54, 55, 56],
-      );
+      expect(transaction.steps.map((position) => position.progress), [
+        53,
+        54,
+        55,
+        56,
+      ]);
       expect(transaction.destination.isFinished, isTrue);
-      expect(_token(transaction.gameState, 'red_0').position.isFinished, isTrue);
+      expect(
+        _token(transaction.gameState, 'red_0').position.isFinished,
+        isTrue,
+      );
     });
 
     test('replaces only the selected token and preserves ordering', () {
@@ -215,7 +222,10 @@ void main() {
 }
 
 GameState _state(int diceValue, List<Token> tokens) {
-  return GameState.withTokens(tokens: tokens, diceResult: DiceResult(diceValue));
+  return GameState.withTokens(
+    tokens: tokens,
+    diceResult: DiceResult(diceValue),
+  );
 }
 
 Token _token(GameState state, String tokenId) {
@@ -223,11 +233,7 @@ Token _token(GameState state, String tokenId) {
 }
 
 Token _yardToken(String id, {PlayerColor color = PlayerColor.red}) {
-  return Token(
-    id: id,
-    ownerColor: color,
-    position: const TokenPosition.yard(),
-  );
+  return Token(id: id, ownerColor: color, position: const TokenPosition.yard());
 }
 
 Token _pathToken(
