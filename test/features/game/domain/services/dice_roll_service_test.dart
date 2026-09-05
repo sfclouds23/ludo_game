@@ -44,9 +44,7 @@ void main() {
 
     test('publishes result only after matching animation completion', () {
       final logicalResult = DiceResult(3);
-      final service = DefaultDiceRollService(
-        _FakeDiceRoller([logicalResult]),
-      );
+      final service = DefaultDiceRollService(_FakeDiceRoller([logicalResult]));
       final rollingState = service.requestRoll(const GameState());
 
       expect(rollingState.diceResult, isNull);
@@ -67,10 +65,7 @@ void main() {
       );
       final rollingState = service.requestRoll(const GameState());
 
-      final state = service.completeRoll(
-        rollingState,
-        DiceResult(1),
-      );
+      final state = service.completeRoll(rollingState, DiceResult(1));
 
       expect(state, same(rollingState));
       expect(state.pendingDiceResult, DiceResult(4));
