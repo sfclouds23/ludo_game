@@ -582,6 +582,33 @@ The turn engine will later consume the legal-move outcome to perform the
 appropriate turn transition. GAME-105 does not own current-player advancement,
 bonus-roll sequencing, capture resolution, or movement animation.
 
+## 12.2 GAME-106 Movement Transaction Contract
+
+GAME-106 establishes how an approved legal move changes authoritative logical
+state:
+
+- a move must still match the current legal move for its token when committed;
+  stale, unknown, or fabricated move data is rejected;
+- committing an approved move creates a new immutable `GameState` rather than
+  mutating the previous state or token objects in place;
+- only the selected token is replaced at the approved logical destination;
+  unrelated tokens and their ordering are preserved;
+- the final logical destination is committed before presentation movement
+  begins;
+- a movement transaction also exposes an ordered sequence of logical positions
+  that presentation may use for one-cell-at-a-time visual playback;
+- for an on-path move, the visual sequence contains every progress value after
+  the source through and including the approved destination;
+- yard release uses progress `0` as its single movement destination;
+- presentation playback and input-lock state are not authoritative game state;
+  they may visualize or temporarily gate interaction but cannot change the
+  committed token destination;
+- interrupting, rebuilding, or skipping presentation playback must not roll back
+  or otherwise redefine the already-committed logical `GameState`.
+
+GAME-106 does not resolve captures or blockades and does not decide bonus turns,
+current-player transitions, winner/ranking state, or multiplayer authority.
+
 ---
 
 # 13. Reference Gameplay Rules Identified
@@ -624,9 +651,9 @@ releases a token from the yard.
 
 The logical board model intentionally does not define every gameplay policy.
 
-Some movement rules were formally decided by GAME-105 and are recorded above.
-The following remaining policies still require explicit decisions or later
-implementation in their relevant Jira Stories.
+Some movement rules were formally decided by GAME-105 and GAME-106 and are
+recorded above. The following remaining policies still require explicit
+decisions or later implementation in their relevant Jira Stories.
 
 ## 14.1 Match Setup
 
@@ -897,11 +924,16 @@ The current authoritative scope primarily covers:
 - normal shared-track and private home-lane movement legality;
 - exact-finish and overshoot rejection;
 - no-legal-move detection without turn mutation;
+- immutable approved-move transactions that commit final logical state before
+  presentation playback;
+- ordered movement-step plans used only for presentation sequencing;
+- presentation interruption cannot redefine or roll back committed logical
+  movement;
 - the decided extra-roll direction for rolling `6`, with execution deferred to
   GAME-108;
 - separation between logical and visual coordinates;
 - server-authoritative architecture boundaries.
 
 Capture resolution, blockade policy, detailed extra-turn chains, turn timing,
-winner/ranking behavior, animation, and multiplayer execution remain deferred
-to their corresponding Jira Stories.
+winner/ranking behavior, and multiplayer execution remain deferred to their
+corresponding Jira Stories.
