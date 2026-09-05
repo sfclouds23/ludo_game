@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ludo_game/features/game/domain/models/dice_result.dart';
+import 'package:ludo_game/features/game/domain/models/game_state.dart';
 import 'package:ludo_game/features/game/domain/models/player_color.dart';
 import 'package:ludo_game/features/game/domain/services/dice_roller.dart';
 import 'package:ludo_game/features/game/presentation/board/ludo_board.dart';
@@ -143,7 +144,7 @@ void main() {
   });
 
   group('GameScreen dice sequencing', () {
-    testWidgets('renders the dice with its initial logical result', (
+    testWidgets('renders ready dice before the first logical result', (
       tester,
     ) async {
       await tester.pumpWidget(_testGameScreen());
@@ -206,6 +207,31 @@ void main() {
         tester.widget<LudoDice>(find.byType(LudoDice)).result,
         DiceResult(4),
       );
+    });
+
+    testWidgets('does not generate a result when game state forbids rolling', (
+      tester,
+    ) async {
+      final roller = _FakeDiceRoller([DiceResult(6)]);
+
+      await tester.pumpWidget(
+        _testGameScreen(
+          diceRoller: roller,
+          initialGameState: const GameState(isDiceRollAllowed: false),
+        ),
+      );
+
+      final dice = tester.widget<LudoDice>(find.byType(LudoDice));
+      expect(dice.isEnabled, isFalse);
+      expect(dice.isRolling, isFalse);
+
+      // Exercise the callback directly as defense in depth: the service still
+      // rejects the request even if presentation dispatches it unexpectedly.
+      dice.onRollRequested!();
+      await tester.pump();
+
+      expect(roller.rollCount, 0);
+      expect(tester.widget<LudoDice>(find.byType(LudoDice)).isEnabled, isFalse);
     });
 
     testWidgets('publishes the same result after animation completion', (
@@ -280,11 +306,13 @@ void main() {
 /// native Rive runtime used by the real application.
 Widget _testGameScreen({
   DiceRoller? diceRoller,
+  GameState initialGameState = const GameState(),
   ValueChanged<DiceResult>? onDiceResultReady,
 }) {
   return MaterialApp(
     home: GameScreen(
       diceRoller: diceRoller,
+      initialGameState: initialGameState,
       onDiceResultReady: onDiceResultReady,
       useRiveDiceRenderer: false,
     ),

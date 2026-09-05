@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/models/dice_result.dart';
+import '../domain/models/game_state.dart';
 import '../domain/models/player_color.dart';
 import '../domain/models/token.dart';
 import '../domain/models/token_position.dart';
+import '../domain/services/dice_roll_service.dart';
 import '../domain/services/dice_roller.dart';
 import 'board/ludo_board.dart';
 import 'board/ludo_token_visual_state.dart';
@@ -15,13 +17,14 @@ import 'dice/ludo_dice.dart';
 
 /// Hosts the production Ludo board and dice presentation.
 ///
-/// The current tokens and visual states are controlled preview data. A later
-/// authoritative GameState will supply live turn state, legal moves, and roll
-/// availability.
+/// Token visual states remain controlled preview data. Dice roll availability,
+/// pending logical result, rolling state, and completed result now live in
+/// [GameState] and are coordinated through [DiceRollService].
 class GameScreen extends StatefulWidget {
   /// Creates the game screen.
   const GameScreen({
     this.diceRoller,
+    this.initialGameState = const GameState(),
     this.onDiceResultReady,
     this.useRiveDiceRenderer = true,
     super.key,
@@ -30,13 +33,19 @@ class GameScreen extends StatefulWidget {
   /// Optional logical dice generator used by this screen.
   ///
   /// Production uses [RandomDiceRoller]. Tests may inject a deterministic
-  /// implementation without changing animation behavior.
+  /// implementation without changing state transitions or animation behavior.
   final DiceRoller? diceRoller;
 
-  /// Optional callback receiving the result after animation completes.
+  /// Initial authoritative local state used by the GAME-104 integration.
   ///
-  /// This is the future integration boundary for the move engine. This screen
-  /// does not apply six rules or calculate legal moves.
+  /// Later turn logic may provide a state with dice rolling disabled without
+  /// changing the dice presentation itself.
+  final GameState initialGameState;
+
+  /// Optional callback receiving the completed result after animation.
+  ///
+  /// This remains the integration boundary for the future move engine. GAME-104
+  /// does not apply six rules, release tokens, or calculate legal moves.
   final ValueChanged<DiceResult>? onDiceResultReady;
 
   /// Whether the dice uses the configured Rive asset renderer.
@@ -108,19 +117,33 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-/// Coordinates controlled board selection and dice presentation.
+/// Coordinates controlled board selection with authoritative dice state.
 class _GameScreenState extends State<GameScreen> {
-  late final DiceRoller _diceRoller;
+  late final DiceRollService _diceRollService;
+  late GameState _gameState;
 
   String? _selectedTokenId = 'red_token_2';
-  DiceResult _diceResult = DiceResult(1);
-  bool _isDiceRolling = false;
+
+  // The dice needs a face before the first logical roll exists. This value is
+  // presentation-only and is replaced by the pending logical result as soon as
+  // a roll starts. Downstream game logic reads GameState.diceResult instead.
+  DiceResult _displayDiceResult = DiceResult(1);
 
   @override
   void initState() {
     super.initState();
 
-    _diceRoller = widget.diceRoller ?? RandomDiceRoller();
+    _diceRollService = DefaultDiceRollService(
+      widget.diceRoller ?? RandomDiceRoller(),
+    );
+    _gameState = widget.initialGameState;
+
+    final initialLogicalResult =
+        _gameState.pendingDiceResult ?? _gameState.diceResult;
+
+    if (initialLogicalResult != null) {
+      _displayDiceResult = initialLogicalResult;
+    }
   }
 
   /// Builds token visual state without evaluating move legality.
@@ -148,33 +171,42 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  /// Generates one logical result before starting its presentation.
+  /// Requests one logical result through the GAME-104 state service.
   void _handleRollRequested() {
-    if (_isDiceRolling) {
+    final nextState = _diceRollService.requestRoll(_gameState);
+
+    // Forbidden or duplicate requests return the same state and consume no
+    // random value.
+    if (identical(nextState, _gameState)) {
       return;
     }
 
-    final nextResult = _diceRoller.roll();
-
     setState(() {
-      _diceResult = nextResult;
-      _isDiceRolling = true;
+      _gameState = nextState;
+      _displayDiceResult = nextState.pendingDiceResult!;
     });
   }
 
-  /// Completes presentation sequencing for the active logical result.
+  /// Publishes the active logical result only after presentation completes.
   void _handleRollAnimationCompleted(DiceResult completedResult) {
-    if (completedResult != _diceResult) {
+    final nextState = _diceRollService.completeRoll(
+      _gameState,
+      completedResult,
+    );
+
+    // Ignore stale completion events from a previous or mismatched animation.
+    if (identical(nextState, _gameState)) {
       return;
     }
 
     setState(() {
-      _isDiceRolling = false;
+      _gameState = nextState;
     });
 
-    // A future move engine may consume this value. No movement or six rule is
-    // implemented in this presentation screen.
-    widget.onDiceResultReady?.call(completedResult);
+    final readyResult = nextState.diceResult;
+    if (readyResult != null) {
+      widget.onDiceResultReady?.call(readyResult);
+    }
   }
 
   @override
@@ -240,10 +272,10 @@ class _GameScreenState extends State<GameScreen> {
                         diceControlDimension: diceControlDimension,
                         horizontalPositionFactor: 0.29,
                         child: LudoDice(
-                          result: _diceResult,
+                          result: _displayDiceResult,
                           dimension: diceControlDimension,
-                          isRolling: _isDiceRolling,
-                          isEnabled: !_isDiceRolling,
+                          isRolling: _gameState.isDiceRolling,
+                          isEnabled: _gameState.canRollDice,
                           useRiveRenderer: widget.useRiveDiceRenderer,
                           onRollRequested: _handleRollRequested,
                           onRollAnimationCompleted:
