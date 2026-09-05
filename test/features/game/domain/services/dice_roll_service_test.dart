@@ -49,10 +49,7 @@ void main() {
 
       expect(rollingState.diceResult, isNull);
 
-      final completedState = service.completeRoll(
-        rollingState,
-        logicalResult,
-      );
+      final completedState = service.completeRoll(rollingState, logicalResult);
 
       expect(completedState.diceResult, same(logicalResult));
       expect(completedState.pendingDiceResult, isNull);
@@ -60,9 +57,7 @@ void main() {
     });
 
     test('ignores stale completion without changing active roll', () {
-      final service = DefaultDiceRollService(
-        _FakeDiceRoller([DiceResult(4)]),
-      );
+      final service = DefaultDiceRollService(_FakeDiceRoller([DiceResult(4)]));
       final rollingState = service.requestRoll(const GameState());
 
       final state = service.completeRoll(rollingState, DiceResult(1));

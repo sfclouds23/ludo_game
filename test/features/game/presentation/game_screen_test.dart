@@ -231,10 +231,7 @@ void main() {
       await tester.pump();
 
       expect(roller.rollCount, 0);
-      expect(
-        tester.widget<LudoDice>(find.byType(LudoDice)).isEnabled,
-        isFalse,
-      );
+      expect(tester.widget<LudoDice>(find.byType(LudoDice)).isEnabled, isFalse);
     });
 
     testWidgets('publishes the same result after animation completion', (
