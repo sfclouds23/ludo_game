@@ -40,9 +40,8 @@ void main() {
     });
 
     test('returns multiple captured tokens in deterministic order', () {
-      var playback = CapturePlayback.start(
-        _resolution(['green_0', 'yellow_0']),
-      ).advance();
+      var playback = CapturePlayback.start(_resolution(['green_0', 'yellow_0']))
+          .advance();
 
       playback = playback.advance();
       expect(playback.phase, CapturePlaybackPhase.returningTokens);
@@ -63,9 +62,8 @@ void main() {
     });
 
     test('returned token IDs view is immutable', () {
-      var playback = CapturePlayback.start(
-        _resolution(['green_0', 'yellow_0']),
-      ).advance();
+      var playback = CapturePlayback.start(_resolution(['green_0', 'yellow_0']))
+          .advance();
       playback = playback.advance();
 
       expect(
@@ -81,11 +79,17 @@ void main() {
       expect(_token(resolution.gameState, 'green_0').position.isInYard, isTrue);
 
       playback = playback.advance();
-      expect(_token(playback.resolution.gameState, 'green_0').position.isInYard, isTrue);
+      expect(
+        _token(playback.resolution.gameState, 'green_0').position.isInYard,
+        isTrue,
+      );
 
       playback = playback.advance();
       expect(playback.isComplete, isTrue);
-      expect(_token(playback.resolution.gameState, 'green_0').position.isInYard, isTrue);
+      expect(
+        _token(playback.resolution.gameState, 'green_0').position.isInYard,
+        isTrue,
+      );
     });
   });
 }
