@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,6 +10,7 @@ import '../domain/models/token_position.dart';
 import '../domain/services/dice_roller.dart';
 import 'board/ludo_board.dart';
 import 'board/ludo_token_visual_state.dart';
+import 'dice/dice_dock.dart';
 import 'dice/ludo_dice.dart';
 
 /// Hosts the production Ludo board and dice presentation.
@@ -17,7 +20,12 @@ import 'dice/ludo_dice.dart';
 /// availability.
 class GameScreen extends StatefulWidget {
   /// Creates the game screen.
-  const GameScreen({this.diceRoller, this.onDiceResultReady, super.key});
+  const GameScreen({
+    this.diceRoller,
+    this.onDiceResultReady,
+    this.useRiveDiceRenderer = true,
+    super.key,
+  });
 
   /// Optional logical dice generator used by this screen.
   ///
@@ -25,13 +33,19 @@ class GameScreen extends StatefulWidget {
   /// implementation without changing animation behavior.
   final DiceRoller? diceRoller;
 
-  /// Optional callback receiving the logical result after animation completes.
+  /// Optional callback receiving the result after animation completes.
   ///
   /// This is the future integration boundary for the move engine. This screen
   /// does not apply six rules or calculate legal moves.
   final ValueChanged<DiceResult>? onDiceResultReady;
 
-  /// Demonstrates yard, shared-track, stacking, home-lane, and finish rendering.
+  /// Whether the dice uses the configured Rive asset renderer.
+  ///
+  /// Production keeps this enabled. Widget tests may disable it to exercise
+  /// sequencing without loading the native Rive runtime.
+  final bool useRiveDiceRenderer;
+
+  /// Demonstrates yard, track, stacking, home-lane, and finish rendering.
   static final List<Token> previewTokens = List.unmodifiable([
     const Token(
       id: 'red_token_0',
@@ -134,7 +148,7 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  /// Requests a completed logical result before starting animation.
+  /// Generates one logical result before starting its presentation.
   void _handleRollRequested() {
     if (_isDiceRolling) {
       return;
@@ -148,10 +162,8 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  /// Completes presentation sequencing for the supplied logical result.
+  /// Completes presentation sequencing for the active logical result.
   void _handleRollAnimationCompleted(DiceResult completedResult) {
-    // Ignore stale completion notifications if a future owner replaces the
-    // active logical result during an animation.
     if (completedResult != _diceResult) {
       return;
     }
@@ -160,8 +172,8 @@ class _GameScreenState extends State<GameScreen> {
       _isDiceRolling = false;
     });
 
-    // The future move engine may consume the result here. No move or six rule
-    // is implemented by this presentation screen.
+    // A future move engine may consume this value. No movement or six rule is
+    // implemented in this presentation screen.
     widget.onDiceResultReady?.call(completedResult);
   }
 
@@ -179,26 +191,71 @@ class _GameScreenState extends State<GameScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Expanded(
-                child: LudoBoard(
-                  tokens: GameScreen.previewTokens,
-                  visualStates: _currentVisualStates(),
-                  onTokenPressed: _handleTokenPressed,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const boardToControlsGap = 8.0;
+              const bottomBreathingRoom = 8.0;
+
+              final diceControlDimension = (constraints.maxWidth * 0.17)
+                  .clamp(64.0, 112.0)
+                  .toDouble();
+
+              final availableBoardHeight =
+                  constraints.maxHeight -
+                  diceControlDimension -
+                  boardToControlsGap -
+                  bottomBreathingRoom;
+
+              final boardDimension = math.min(
+                constraints.maxWidth,
+                availableBoardHeight,
+              );
+
+              if (!boardDimension.isFinite || boardDimension <= 0) {
+                return const SizedBox.shrink();
+              }
+
+              return Center(
+                child: SizedBox(
+                  width: boardDimension,
+                  height:
+                      boardDimension +
+                      boardToControlsGap +
+                      diceControlDimension +
+                      bottomBreathingRoom,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox.square(
+                        dimension: boardDimension,
+                        child: LudoBoard(
+                          tokens: GameScreen.previewTokens,
+                          visualStates: _currentVisualStates(),
+                          onTokenPressed: _handleTokenPressed,
+                        ),
+                      ),
+                      const SizedBox(height: boardToControlsGap),
+                      DiceDock(
+                        boardDimension: boardDimension,
+                        diceControlDimension: diceControlDimension,
+                        horizontalPositionFactor: 0.29,
+                        child: LudoDice(
+                          result: _diceResult,
+                          dimension: diceControlDimension,
+                          isRolling: _isDiceRolling,
+                          isEnabled: !_isDiceRolling,
+                          useRiveRenderer: widget.useRiveDiceRenderer,
+                          onRollRequested: _handleRollRequested,
+                          onRollAnimationCompleted:
+                              _handleRollAnimationCompleted,
+                        ),
+                      ),
+                      const SizedBox(height: bottomBreathingRoom),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              LudoDice(
-                result: _diceResult,
-                dimension: 88,
-                isRolling: _isDiceRolling,
-                isEnabled: !_isDiceRolling,
-                onRollRequested: _handleRollRequested,
-                onRollAnimationCompleted: _handleRollAnimationCompleted,
-              ),
-              const SizedBox(height: 8),
-            ],
+              );
+            },
           ),
         ),
       ),

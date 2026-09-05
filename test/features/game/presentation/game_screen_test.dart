@@ -85,7 +85,7 @@ void main() {
     testWidgets('passes preview tokens and visual states into the board', (
       tester,
     ) async {
-      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pumpWidget(_testGameScreen());
 
       final board = tester.widget<LudoBoard>(find.byType(LudoBoard));
 
@@ -103,7 +103,7 @@ void main() {
     testWidgets('updates visual selection when a token is pressed', (
       tester,
     ) async {
-      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pumpWidget(_testGameScreen());
 
       await tester.tap(
         find.byKey(LudoToken.repaintBoundaryKeyFor('green_token_1')),
@@ -120,7 +120,7 @@ void main() {
     testWidgets('allows an idle preview token to display selection', (
       tester,
     ) async {
-      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pumpWidget(_testGameScreen());
 
       await tester.tap(
         find.byKey(LudoToken.repaintBoundaryKeyFor('blue_token_0')),
@@ -135,7 +135,7 @@ void main() {
     });
 
     testWidgets('shows the board screen title', (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pumpWidget(_testGameScreen());
 
       expect(find.text('Ludo Board'), findsOneWidget);
       expect(find.byTooltip('Return home'), findsOneWidget);
@@ -146,46 +146,41 @@ void main() {
     testWidgets('renders the dice with its initial logical result', (
       tester,
     ) async {
-      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pumpWidget(_testGameScreen());
 
       expect(find.byType(LudoDice), findsOneWidget);
 
       final dice = tester.widget<LudoDice>(find.byType(LudoDice));
-      final painter =
-          tester
-                  .widget<CustomPaint>(
-                    find.descendant(
-                      of: find.byType(LudoDice),
-                      matching: find.byType(CustomPaint),
-                    ),
-                  )
-                  .painter
-              as LudoDicePainter;
+      final painter = _dicePainter(tester);
 
       expect(dice.result, DiceResult(1));
       expect(dice.isRolling, isFalse);
       expect(dice.isEnabled, isTrue);
+      expect(dice.useRiveRenderer, isFalse);
       expect(painter.result, DiceResult(1));
     });
 
-    testWidgets('generates the logical result before starting animation', (
+    testWidgets('generates logical result before starting animation', (
       tester,
     ) async {
       final roller = _FakeDiceRoller([DiceResult(5)]);
 
-      await tester.pumpWidget(
-        MaterialApp(home: GameScreen(diceRoller: roller)),
-      );
+      await tester.pumpWidget(_testGameScreen(diceRoller: roller));
 
       await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
       await tester.pump();
 
       final dice = tester.widget<LudoDice>(find.byType(LudoDice));
+      final painter = _dicePainter(tester);
 
       expect(roller.rollCount, 1);
       expect(dice.result, DiceResult(5));
       expect(dice.isRolling, isTrue);
       expect(dice.isEnabled, isFalse);
+      expect(dice.useRiveRenderer, isFalse);
+
+      // The generated logical result remains hidden until landing.
+      expect(painter.result, isNot(DiceResult(5)));
     });
 
     testWidgets('does not generate another result during animation', (
@@ -193,9 +188,7 @@ void main() {
     ) async {
       final roller = _FakeDiceRoller([DiceResult(4), DiceResult(6)]);
 
-      await tester.pumpWidget(
-        MaterialApp(home: GameScreen(diceRoller: roller)),
-      );
+      await tester.pumpWidget(_testGameScreen(diceRoller: roller));
 
       await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
       await tester.pump();
@@ -205,8 +198,6 @@ void main() {
       expect(rollingDice.isRolling, isTrue);
       expect(rollingDice.onRollRequested, isNotNull);
 
-      // Calling the screen callback again simulates a duplicate external
-      // request while animation is active.
       rollingDice.onRollRequested!();
       await tester.pump();
 
@@ -225,13 +216,11 @@ void main() {
       DiceResult? readyResult;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: GameScreen(
-            diceRoller: roller,
-            onDiceResultReady: (result) {
-              readyResult = result;
-            },
-          ),
+        _testGameScreen(
+          diceRoller: roller,
+          onDiceResultReady: (result) {
+            readyResult = result;
+          },
         ),
       );
 
@@ -240,13 +229,15 @@ void main() {
 
       expect(readyResult, isNull);
 
-      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
 
       final dice = tester.widget<LudoDice>(find.byType(LudoDice));
+      final painter = _dicePainter(tester);
 
       expect(readyResult, same(logicalResult));
       expect(dice.result, same(logicalResult));
+      expect(painter.result, same(logicalResult));
       expect(dice.isRolling, isFalse);
       expect(dice.isEnabled, isTrue);
     });
@@ -260,28 +251,65 @@ void main() {
       final completedResults = <DiceResult>[];
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: GameScreen(
-            diceRoller: roller,
-            onDiceResultReady: completedResults.add,
-          ),
+        _testGameScreen(
+          diceRoller: roller,
+          onDiceResultReady: completedResults.add,
         ),
       );
 
       await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
 
       await tester.tap(find.byKey(LudoDice.repaintBoundaryKey));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
 
       expect(roller.rollCount, 2);
       expect(completedResults, [firstResult, secondResult]);
     });
   });
+}
+
+/// Creates a GameScreen configured for deterministic widget testing.
+///
+/// Rive stays enabled by default in production. These widget tests use the
+/// procedural renderer because Flutter's VM test process does not load the
+/// native Rive runtime used by the real application.
+Widget _testGameScreen({
+  DiceRoller? diceRoller,
+  ValueChanged<DiceResult>? onDiceResultReady,
+}) {
+  return MaterialApp(
+    home: GameScreen(
+      diceRoller: diceRoller,
+      onDiceResultReady: onDiceResultReady,
+      useRiveDiceRenderer: false,
+    ),
+  );
+}
+
+/// Returns the procedural painter belonging specifically to LudoDice.
+///
+/// Material widgets can contain unrelated CustomPaint widgets, so this helper
+/// identifies the painter by its concrete type instead of assuming only one
+/// CustomPaint exists in the complete screen.
+LudoDicePainter _dicePainter(WidgetTester tester) {
+  final customPaintWidgets = tester
+      .widgetList<CustomPaint>(
+        find.descendant(
+          of: find.byType(LudoDice),
+          matching: find.byType(CustomPaint),
+        ),
+      )
+      .where((widget) => widget.painter is LudoDicePainter)
+      .toList();
+
+  expect(customPaintWidgets, hasLength(1));
+
+  return customPaintWidgets.single.painter! as LudoDicePainter;
 }
 
 /// Deterministic logical roller used independently from dice animation.
