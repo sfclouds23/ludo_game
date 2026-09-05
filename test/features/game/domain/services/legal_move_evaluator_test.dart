@@ -105,10 +105,9 @@ void main() {
       });
 
       test('finished token can never move again', () {
-        final state = _state(
-          DiceResult(1),
-          [_pathToken('red_0', TokenPosition.finishProgress)],
-        );
+        final state = _state(DiceResult(1), [
+          _pathToken('red_0', TokenPosition.finishProgress),
+        ]);
         expect(
           evaluator.evaluate(state, PlayerColor.red).hasLegalMoves,
           isFalse,
@@ -130,10 +129,9 @@ void main() {
           _pathToken('red_0', 10),
           _pathToken('green_0', 10, color: PlayerColor.green),
         ]);
-        expect(
-          evaluator.evaluate(state, PlayerColor.red).movableTokenIds,
-          ['red_0'],
-        );
+        expect(evaluator.evaluate(state, PlayerColor.red).movableTokenIds, [
+          'red_0',
+        ]);
       });
 
       test(
@@ -156,10 +154,11 @@ void main() {
           _pathToken('red_0', 0),
           _pathToken('red_1', 10),
         ]);
-        expect(
-          evaluator.evaluate(state, PlayerColor.red).movableTokenIds,
-          ['red_2', 'red_0', 'red_1'],
-        );
+        expect(evaluator.evaluate(state, PlayerColor.red).movableTokenIds, [
+          'red_2',
+          'red_0',
+          'red_1',
+        ]);
       });
     });
 
@@ -170,10 +169,9 @@ void main() {
         progress++
       ) {
         for (var diceValue = 1; diceValue <= 6; diceValue++) {
-          final state = _state(
-            DiceResult(diceValue),
-            [_pathToken('red_0', progress)],
-          );
+          final state = _state(DiceResult(diceValue), [
+            _pathToken('red_0', progress),
+          ]);
           final result = evaluator.evaluate(state, PlayerColor.red);
           final expectedDestination = progress + diceValue;
           final shouldBeLegal =
@@ -203,11 +201,7 @@ GameState _state(DiceResult result, List<Token> tokens) {
 }
 
 Token _yardToken(String id, {PlayerColor color = PlayerColor.red}) {
-  return Token(
-    id: id,
-    ownerColor: color,
-    position: const TokenPosition.yard(),
-  );
+  return Token(id: id, ownerColor: color, position: const TokenPosition.yard());
 }
 
 Token _pathToken(

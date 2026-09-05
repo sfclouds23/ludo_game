@@ -38,7 +38,7 @@ class LegalMove {
 class LegalMoveResult {
   /// Creates a result from [moves].
   LegalMoveResult(Iterable<LegalMove> moves)
-      : moves = List<LegalMove>.unmodifiable(moves);
+    : moves = List<LegalMove>.unmodifiable(moves);
 
   /// Legal token choices in the same deterministic order as GameState.tokens.
   final List<LegalMove> moves;
