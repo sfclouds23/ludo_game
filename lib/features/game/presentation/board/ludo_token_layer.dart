@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/player_color.dart';
 import '../../domain/models/token.dart';
+import '../../domain/models/token_position.dart';
 import 'board_geometry.dart';
 import 'ludo_token.dart';
 import 'ludo_token_visual_state.dart';
@@ -21,6 +22,7 @@ class LudoTokenLayer extends StatelessWidget {
   const LudoTokenLayer({
     required this.tokens,
     this.visualStates = const {},
+    this.visualPositionOverrides = const {},
     this.onTokenPressed,
     super.key,
   });
@@ -38,6 +40,13 @@ class LudoTokenLayer extends StatelessWidget {
   /// Tokens without an entry use [LudoTokenVisualState.idle]. The caller is
   /// responsible for deciding which tokens are movable or selected.
   final Map<String, LudoTokenVisualState> visualStates;
+
+  /// Temporary presentation-only positions used while visual movement plays.
+  ///
+  /// These positions never modify authoritative [tokens]. A controller may use
+  /// them to display intermediate GAME-106 movement steps after the final
+  /// logical GameState has already been committed.
+  final Map<String, TokenPosition> visualPositionOverrides;
 
   /// Optional callback invoked with the pressed token's stable ID.
   ///
@@ -58,18 +67,21 @@ class LudoTokenLayer extends StatelessWidget {
 
         _validateUniqueTokenIds();
 
+        final displayTokens = _displayTokens();
         final geometry = BoardGeometry(boardSize);
         final baseTokenDimension = geometry.cellSize * 1.35;
-        final yardSlotIndices = _yardSlotIndices();
+        final yardSlotIndices = _yardSlotIndices(displayTokens);
         final tokenCenters = _tokenCenters(
+          displayTokens: displayTokens,
           geometry: geometry,
           yardSlotIndices: yardSlotIndices,
         );
         final stackPlacements = _stackPlacements(
+          displayTokens: displayTokens,
           tokenCenters: tokenCenters,
           cellSize: geometry.cellSize,
         );
-        final paintOrderedTokens = _paintOrderedTokens();
+        final paintOrderedTokens = _paintOrderedTokens(displayTokens);
 
         return RepaintBoundary(
           key: repaintBoundaryKey,
@@ -93,18 +105,29 @@ class LudoTokenLayer extends StatelessWidget {
     );
   }
 
+  /// Creates presentation-only token copies for active visual overrides.
+  List<Token> _displayTokens() {
+    return <Token>[
+      for (final token in tokens)
+        token.copyWith(
+          position: visualPositionOverrides[token.id] ?? token.position,
+        ),
+    ];
+  }
+
   /// Resolves the base visual center of every token.
   ///
   /// Yard tokens already receive separate deterministic yard-slot coordinates.
   /// Other co-located tokens resolve to the same center and are separated later
   /// by [TokenStackLayout].
   Map<String, Offset> _tokenCenters({
+    required List<Token> displayTokens,
     required BoardGeometry geometry,
     required Map<String, int> yardSlotIndices,
   }) {
     final centers = <String, Offset>{};
 
-    for (final token in tokens) {
+    for (final token in displayTokens) {
       centers[token.id] = TokenCoordinateMapper.centerFor(
         token: token,
         geometry: geometry,
@@ -120,12 +143,13 @@ class LudoTokenLayer extends StatelessWidget {
   /// Grouping by an already resolved presentation coordinate keeps this logic
   /// independent from occupancy, capture, blockade, and legal-move rules.
   Map<String, TokenStackPlacement> _stackPlacements({
+    required List<Token> displayTokens,
     required Map<String, Offset> tokenCenters,
     required double cellSize,
   }) {
     final tokenIdsByCenter = <Offset, List<String>>{};
 
-    for (final token in tokens) {
+    for (final token in displayTokens) {
       final center = tokenCenters[token.id]!;
 
       tokenIdsByCenter.putIfAbsent(center, () => <String>[]).add(token.id);
@@ -146,8 +170,8 @@ class LudoTokenLayer extends StatelessWidget {
   ///
   /// Stack offsets remain tied to sorted token IDs, while emphasized tokens
   /// paint later so their supplied state remains visible and tappable.
-  List<Token> _paintOrderedTokens() {
-    final orderedTokens = List<Token>.of(tokens);
+  List<Token> _paintOrderedTokens(List<Token> displayTokens) {
+    final orderedTokens = List<Token>.of(displayTokens);
 
     orderedTokens.sort((first, second) {
       final firstPriority = _paintPriorityFor(first.id);
@@ -220,12 +244,12 @@ class LudoTokenLayer extends StatelessWidget {
   ///
   /// Token IDs are sorted so input-list ordering cannot move yard tokens
   /// between visual slots.
-  Map<String, int> _yardSlotIndices() {
+  Map<String, int> _yardSlotIndices(List<Token> displayTokens) {
     final slotIndices = <String, int>{};
 
     for (final playerColor in PlayerColor.values) {
       final yardTokens =
-          tokens
+          displayTokens
               .where(
                 (token) =>
                     token.ownerColor == playerColor && token.position.isInYard,
