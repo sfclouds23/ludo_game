@@ -7,10 +7,7 @@ import '../../domain/models/token_position.dart';
 /// object only tracks which logical step the presentation should currently
 /// display while input remains locked.
 class TokenMovementPlayback {
-  TokenMovementPlayback._({
-    required this.transaction,
-    required this.stepIndex,
-  });
+  TokenMovementPlayback._({required this.transaction, required this.stepIndex});
 
   /// Starts playback at the transaction's first visual movement step.
   factory TokenMovementPlayback.start(TokenMoveTransaction transaction) {

@@ -109,7 +109,9 @@ class LudoTokenLayer extends StatelessWidget {
   List<Token> _displayTokens() {
     return <Token>[
       for (final token in tokens)
-        token.copyWith(position: visualPositionOverrides[token.id] ?? token.position),
+        token.copyWith(
+          position: visualPositionOverrides[token.id] ?? token.position,
+        ),
     ];
   }
 
