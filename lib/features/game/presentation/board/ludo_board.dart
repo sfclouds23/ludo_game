@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../domain/models/token.dart';
+import '../../domain/models/token_position.dart';
 import 'ludo_board_painter.dart';
 import 'ludo_token_layer.dart';
 import 'ludo_token_visual_state.dart';
@@ -19,6 +20,7 @@ class LudoBoard extends StatelessWidget {
   const LudoBoard({
     this.tokens = const [],
     this.visualStates = const {},
+    this.visualPositionOverrides = const {},
     this.onTokenPressed,
     this.maximumDimension = 720,
     super.key,
@@ -40,6 +42,12 @@ class LudoBoard extends StatelessWidget {
   /// The owning application or game-state layer determines these values.
   /// Tokens without an entry are displayed using the idle visual state.
   final Map<String, LudoTokenVisualState> visualStates;
+
+  /// Presentation-only token positions used for intermediate visual movement.
+  ///
+  /// The authoritative token collection may already contain a move's final
+  /// destination while this overlay displays earlier GAME-106 visual steps.
+  final Map<String, TokenPosition> visualPositionOverrides;
 
   /// Optional callback invoked with the stable ID of a pressed token.
   ///
@@ -91,6 +99,7 @@ class LudoBoard extends StatelessWidget {
                 LudoTokenLayer(
                   tokens: tokens,
                   visualStates: visualStates,
+                  visualPositionOverrides: visualPositionOverrides,
                   onTokenPressed: onTokenPressed,
                 ),
               ],
