@@ -35,7 +35,8 @@ class CaptureResolver {
 
     // Yard is not a valid committed movement destination. Private home lanes,
     // finish cells, and configured shared safe cells cannot produce captures.
-    if (destinationCell == null || BoardDefinition.isSafeCell(destinationCell)) {
+    if (destinationCell == null ||
+        BoardDefinition.isSafeCell(destinationCell)) {
       return CaptureResolution(
         gameState: movementState,
         movedTokenId: movedToken.id,
@@ -47,7 +48,8 @@ class CaptureResolver {
     final resolvedTokens = <Token>[];
 
     for (final token in movementState.tokens) {
-      if (token.id == movedToken.id || token.ownerColor == movedToken.ownerColor) {
+      if (token.id == movedToken.id ||
+          token.ownerColor == movedToken.ownerColor) {
         resolvedTokens.add(token);
         continue;
       }
@@ -55,7 +57,9 @@ class CaptureResolver {
       final tokenCell = TokenCellResolver.resolve(token);
       if (tokenCell == destinationCell) {
         capturedTokenIds.add(token.id);
-        resolvedTokens.add(token.copyWith(position: const TokenPosition.yard()));
+        resolvedTokens.add(
+          token.copyWith(position: const TokenPosition.yard()),
+        );
       } else {
         resolvedTokens.add(token);
       }
