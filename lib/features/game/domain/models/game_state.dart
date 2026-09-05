@@ -1,21 +1,55 @@
 import 'dice_result.dart';
+import 'token.dart';
 
 /// Represents the authoritative local state needed by the current game engine.
 ///
-/// GAME-104 owns only the dice portion of this model for now. Later Stories may
-/// extend GameState with turn, legal-move, capture, ranking, and multiplayer
-/// state without moving those rules into the dice system.
+/// GAME-104 owns the dice lifecycle. GAME-105 adds immutable token positions so
+/// legal moves can be derived from state rather than presentation data. Later
+/// Stories may extend GameState with turn, capture, ranking, and multiplayer
+/// state without moving those rules into the dice or legal-move systems.
 class GameState {
-  /// Creates immutable local game state.
+  /// Creates state without active tokens.
+  ///
+  /// This constructor remains const for dice-only states and tests. Use
+  /// [GameState.withTokens] when token positions are part of the state.
   const GameState({
     this.diceResult,
     this.pendingDiceResult,
     this.isDiceRolling = false,
     this.isDiceRollAllowed = true,
-  }) : assert(
+  }) : tokens = const <Token>[],
+       assert(
          isDiceRolling ? pendingDiceResult != null : pendingDiceResult == null,
          'A pending dice result must exist only while a roll is active.',
        );
+
+  /// Creates authoritative state containing immutable token positions.
+  GameState.withTokens({
+    required Iterable<Token> tokens,
+    this.diceResult,
+    this.pendingDiceResult,
+    this.isDiceRolling = false,
+    this.isDiceRollAllowed = true,
+  }) : tokens = List<Token>.unmodifiable(tokens) {
+    assert(
+      isDiceRolling ? pendingDiceResult != null : pendingDiceResult == null,
+      'A pending dice result must exist only while a roll is active.',
+    );
+  }
+
+  GameState._({
+    required this.tokens,
+    required this.diceResult,
+    required this.pendingDiceResult,
+    required this.isDiceRolling,
+    required this.isDiceRollAllowed,
+  });
+
+  /// Current authoritative logical tokens.
+  ///
+  /// The collection is immutable. GAME-105 reads these positions but never
+  /// mutates them; GAME-106 will own accepted movement transactions.
+  final List<Token> tokens;
 
   /// Last completed logical dice result available to downstream game logic.
   ///
@@ -49,7 +83,8 @@ class GameState {
       return this;
     }
 
-    return GameState(
+    return GameState._(
+      tokens: tokens,
       diceResult: diceResult,
       pendingDiceResult: result,
       isDiceRolling: true,
@@ -66,8 +101,10 @@ class GameState {
       return this;
     }
 
-    return GameState(
+    return GameState._(
+      tokens: tokens,
       diceResult: result,
+      pendingDiceResult: null,
       isDiceRolling: false,
       isDiceRollAllowed: isDiceRollAllowed,
     );
@@ -81,7 +118,8 @@ class GameState {
       return this;
     }
 
-    return GameState(
+    return GameState._(
+      tokens: tokens,
       diceResult: diceResult,
       pendingDiceResult: pendingDiceResult,
       isDiceRolling: isDiceRolling,
@@ -96,6 +134,7 @@ class GameState {
     }
 
     return other is GameState &&
+        _tokensEqual(other.tokens, tokens) &&
         other.diceResult == diceResult &&
         other.pendingDiceResult == pendingDiceResult &&
         other.isDiceRolling == isDiceRolling &&
@@ -104,6 +143,7 @@ class GameState {
 
   @override
   int get hashCode => Object.hash(
+    Object.hashAll(tokens),
     diceResult,
     pendingDiceResult,
     isDiceRolling,
@@ -113,10 +153,29 @@ class GameState {
   @override
   String toString() {
     return 'GameState('
+        'tokens: $tokens, '
         'diceResult: $diceResult, '
         'pendingDiceResult: $pendingDiceResult, '
         'isDiceRolling: $isDiceRolling, '
         'isDiceRollAllowed: $isDiceRollAllowed'
         ')';
   }
+}
+
+bool _tokensEqual(List<Token> first, List<Token> second) {
+  if (identical(first, second)) {
+    return true;
+  }
+
+  if (first.length != second.length) {
+    return false;
+  }
+
+  for (var index = 0; index < first.length; index++) {
+    if (first[index] != second[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
