@@ -10,6 +10,7 @@ void main() {
     double dimension = 96,
     bool isRolling = false,
     bool isEnabled = true,
+    bool useRiveRenderer = false,
     VoidCallback? onRollRequested,
     ValueChanged<DiceResult>? onRollAnimationCompleted,
     bool disableAnimations = false,
@@ -23,6 +24,7 @@ void main() {
             dimension: dimension,
             isRolling: isRolling,
             isEnabled: isEnabled,
+            useRiveRenderer: useRiveRenderer,
             onRollRequested: onRollRequested,
             onRollAnimationCompleted: onRollAnimationCompleted,
           ),
@@ -31,13 +33,15 @@ void main() {
     );
   }
 
-  LudoDicePainter currentPainter(WidgetTester tester) {
-    final customPaint = tester.widget<CustomPaint>(
-      find.descendant(
-        of: find.byType(LudoDice),
-        matching: find.byType(CustomPaint),
-      ),
+  Finder diceCustomPaintFinder() {
+    return find.descendant(
+      of: find.byType(LudoDice),
+      matching: find.byType(CustomPaint),
     );
+  }
+
+  LudoDicePainter currentPainter(WidgetTester tester) {
+    final customPaint = tester.widget<CustomPaint>(diceCustomPaintFinder());
 
     return customPaint.painter as LudoDicePainter;
   }
@@ -74,7 +78,7 @@ void main() {
       expect(tester.getSize(repaintBoundary), const Size.square(112));
     });
 
-    testWidgets('forwards the supplied logical result to its painter', (
+    testWidgets('forwards a resting result to the fallback painter', (
       tester,
     ) async {
       final result = DiceResult(5);
@@ -84,7 +88,7 @@ void main() {
       expect(currentPainter(tester).result, result);
     });
 
-    testWidgets('updates its painter when the logical result changes', (
+    testWidgets('updates a resting fallback face when result changes', (
       tester,
     ) async {
       await tester.pumpWidget(buildDice(result: DiceResult(2)));
@@ -106,10 +110,21 @@ void main() {
       expect(repaintBoundary, findsOneWidget);
       expect(tester.widget(repaintBoundary), isA<RepaintBoundary>());
     });
+
+    testWidgets('uses the procedural renderer when Rive is disabled', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildDice(result: DiceResult(4), useRiveRenderer: false),
+      );
+
+      expect(diceCustomPaintFinder(), findsOneWidget);
+      expect(currentPainter(tester).result, DiceResult(4));
+    });
   });
 
   group('LudoDice roll requests', () {
-    testWidgets('forwards a roll request when the caller permits it', (
+    testWidgets('forwards a roll request when caller permits it', (
       tester,
     ) async {
       var requestCount = 0;
@@ -140,8 +155,6 @@ void main() {
         buildDice(isEnabled: false, onRollRequested: () {}),
       );
 
-      // The widget consumes the restriction without determining why rolling
-      // is unavailable.
       expect(currentGestureDetector(tester).onTap, isNull);
     });
 
@@ -156,10 +169,8 @@ void main() {
     });
   });
 
-  group('LudoDice animation', () {
-    testWidgets('changes its transform during tumble animation', (
-      tester,
-    ) async {
+  group('LudoDice animation sequencing', () {
+    testWidgets('changes fallback transform during animation', (tester) async {
       await tester.pumpWidget(
         buildDice(result: DiceResult(4), isRolling: true),
       );
@@ -173,20 +184,53 @@ void main() {
       expect(animatedTransform, isNot(initialTransform));
     });
 
-    testWidgets('returns to its resting transform after animation', (
+    testWidgets('cycles temporary fallback faces while rolling', (
       tester,
     ) async {
+      await tester.pumpWidget(buildDice(result: DiceResult(2)));
+
+      await tester.pumpWidget(
+        buildDice(result: DiceResult(6), isRolling: true),
+      );
+
+      final firstTemporaryFace = currentPainter(tester).result;
+
+      await tester.pump(const Duration(milliseconds: 180));
+
+      final secondTemporaryFace = currentPainter(tester).result;
+
+      expect(firstTemporaryFace, isNot(DiceResult(6)));
+      expect(secondTemporaryFace, isNot(firstTemporaryFace));
+    });
+
+    testWidgets('hides fallback result until landing', (tester) async {
+      final previousResult = DiceResult(2);
+      final finalResult = DiceResult(5);
+
+      await tester.pumpWidget(buildDice(result: previousResult));
+
+      await tester.pumpWidget(buildDice(result: finalResult, isRolling: true));
+
+      expect(currentPainter(tester).result, isNot(finalResult));
+
+      await tester.pump(const Duration(milliseconds: 1300));
+      await tester.pump();
+
+      expect(currentPainter(tester).result, finalResult);
+    });
+
+    testWidgets('returns fallback to resting transform', (tester) async {
       await tester.pumpWidget(
         buildDice(result: DiceResult(3), isRolling: true),
       );
 
-      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
 
       expect(currentTransform(tester).transform, equals(Matrix4.identity()));
     });
 
-    testWidgets('reports the supplied result after animation completes', (
+    testWidgets('reports supplied result after animation completes', (
       tester,
     ) async {
       final result = DiceResult(6);
@@ -204,15 +248,14 @@ void main() {
 
       expect(completedResult, isNull);
 
-      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
 
       expect(completedResult, same(result));
+      expect(currentPainter(tester).result, same(result));
     });
 
-    testWidgets('reports animation completion only once per roll', (
-      tester,
-    ) async {
+    testWidgets('reports completion only once per roll', (tester) async {
       var completionCount = 0;
 
       await tester.pumpWidget(
@@ -225,7 +268,7 @@ void main() {
         ),
       );
 
-      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
 
@@ -249,16 +292,16 @@ void main() {
         ),
       );
 
-      // Run the completion callback scheduled after the initial build.
       await tester.pump();
 
       expect(currentTransform(tester).transform, equals(Matrix4.identity()));
+      expect(currentPainter(tester).result, same(result));
       expect(completedResult, same(result));
     });
 
-    testWidgets('starts a new animation when a rolling result changes', (
-      tester,
-    ) async {
+    testWidgets('restarts hidden fallback when result changes', (tester) async {
+      final replacementResult = DiceResult(5);
+
       await tester.pumpWidget(
         buildDice(result: DiceResult(2), isRolling: true),
       );
@@ -266,17 +309,24 @@ void main() {
       await tester.pump(const Duration(milliseconds: 700));
 
       await tester.pumpWidget(
-        buildDice(result: DiceResult(5), isRolling: true),
+        buildDice(result: replacementResult, isRolling: true),
       );
 
       final restartedTransform = currentTransformValues(tester);
+
+      expect(currentPainter(tester).result, isNot(replacementResult));
 
       await tester.pump(const Duration(milliseconds: 250));
 
       final animatedTransform = currentTransformValues(tester);
 
-      expect(currentPainter(tester).result, DiceResult(5));
       expect(animatedTransform, isNot(restartedTransform));
+      expect(currentPainter(tester).result, isNot(replacementResult));
+
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump();
+
+      expect(currentPainter(tester).result, replacementResult);
     });
   });
 }
