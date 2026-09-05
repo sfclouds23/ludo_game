@@ -285,8 +285,9 @@ Conceptually:
 → `home_lane_4`
 → `finish`
 
-Exact-finish movement requirements will be defined and enforced by the
-legal-move system.
+GAME-105 defines finish movement as exact-count movement. A token reaches
+progress `56` only when the dice value lands exactly on finish. A move whose
+calculated destination would exceed progress `56` is not legal.
 
 ---
 
@@ -550,6 +551,37 @@ The legal-move system is responsible for deciding whether:
 - a movement would exceed finish;
 - another game rule prevents the movement.
 
+## 12.1 GAME-105 Legal-Move Rules
+
+GAME-105 establishes the following authoritative legal-move rules:
+
+- only a completed logical dice result may be used for legal-move evaluation;
+- a pending dice result that is still being animated is not available to the
+  legal-move engine;
+- only a dice result of `6` releases a token from the yard;
+- releasing a yard token places it on player-relative progress `0`;
+- the release action consumes that move choice and does not additionally move
+  the released token six progress steps;
+- when a `6` can both release a yard token and move an existing token, both are
+  legal choices and the player may choose either token;
+- a token already on its movement path advances exactly the rolled number of
+  player-relative progress steps when that destination is legal;
+- a token may move from the shared track into its own private home lane through
+  the same player-relative progress calculation;
+- a token may move within its own private home lane;
+- exact dice movement is required to reach progress `56`;
+- a move that would exceed progress `56` is illegal;
+- a token already at progress `56` has no further legal movement;
+- legal-move evaluation considers only tokens owned by the player being
+  evaluated;
+- when none of that player's tokens can legally use the completed dice result,
+  GAME-105 reports a no-legal-move outcome and does not mutate token state or
+  advance the current player.
+
+The turn engine will later consume the legal-move outcome to perform the
+appropriate turn transition. GAME-105 does not own current-player advancement,
+bonus-roll sequencing, capture resolution, or movement animation.
+
 ---
 
 # 13. Reference Gameplay Rules Identified
@@ -583,8 +615,8 @@ from its starting area after rolling either:
 - `1`; or
 - `6`.
 
-That behavior must not be adopted by the engine until our legal-move rules
-explicitly choose it.
+GAME-105 explicitly chooses a different rule for this project: only `6`
+releases a token from the yard.
 
 ---
 
@@ -592,8 +624,9 @@ explicitly choose it.
 
 The logical board model intentionally does not define every gameplay policy.
 
-The following rules require explicit decisions in their relevant Jira
-Stories before becoming authoritative.
+Some movement rules were formally decided by GAME-105 and are recorded above.
+The following remaining policies still require explicit decisions or later
+implementation in their relevant Jira Stories.
 
 ## 14.1 Match Setup
 
@@ -608,22 +641,34 @@ To decide:
 
 ## 14.2 Token Release
 
-To decide:
+Decided by GAME-105:
 
-- whether only `6` releases a token;
-- whether both `1` and `6` release a token;
-- whether other game modes may configure this behavior;
-- what happens when a player can either release a new token or move an
-  existing token.
+- only `6` releases a token from the yard;
+- release places the chosen token on progress `0`;
+- when a release and an existing-token move are both legal, both remain valid
+  choices and the player chooses which token to use.
+
+Still pending for future configuration work:
+
+- whether alternate game modes may configure different release values.
 
 ---
 
 ## 14.3 Dice and Extra Turns
 
-To decide:
+Decided gameplay direction:
 
-- whether rolling `6` grants another roll;
-- consecutive-six behavior;
+- rolling `6` grants another roll, including when the current `6` has no legal
+  token move;
+- an unusable `6` is not carried forward or added to a later result; the next
+  roll is a new independent dice result.
+
+The legal-move engine does not execute this bonus-roll behavior. GAME-108 will
+own the turn-state transition and bonus-roll sequencing.
+
+Still to decide:
+
+- consecutive-six behavior beyond the basic extra roll;
 - whether three consecutive sixes cause a penalty;
 - maximum extra-turn chains.
 
@@ -655,12 +700,18 @@ To decide:
 
 ## 14.6 Finish Rules
 
-To decide:
+Decided by GAME-105:
 
-- whether exact dice movement is required to reach finish;
-- behavior when the dice value would exceed finish;
+- exact dice movement is required to reach finish at progress `56`;
+- a dice result that would move a token beyond progress `56` cannot be used by
+  that token;
+- a token at progress `56` is fully completed for movement purposes and cannot
+  move again.
+
+Still to decide in later turn/completion Stories:
+
 - whether finishing a token grants another roll;
-- when a token is considered fully completed.
+- match winner/ranking consequences after tokens finish.
 
 ---
 
@@ -678,13 +729,20 @@ To decide:
 
 ## 14.8 Turn and Timeout Rules
 
-To decide:
+GAME-105 defines only the no-legal-move outcome: when no owned token can use the
+completed dice result, no token movement occurs for that result. The legal-move
+engine does not itself change the current player.
+
+The GAME-108 turn engine will later decide and execute the resulting player
+transition, including the already-decided extra-roll behavior for a `6`.
+
+Still to decide:
 
 - turn duration;
 - dice-roll timeout;
 - move-selection timeout;
 - automatic actions after timeout;
-- skipped turns;
+- skipped-turn policy beyond the legal-move outcome;
 - disconnect handling.
 
 ---
@@ -833,9 +891,17 @@ The current authoritative scope primarily covers:
 - finish positions;
 - safe-cell identification;
 - deterministic player path mapping;
+- completed-dice-only legal-move evaluation;
+- yard release on `6` to progress `0`;
+- player choice between yard release and another legal move on `6`;
+- normal shared-track and private home-lane movement legality;
+- exact-finish and overshoot rejection;
+- no-legal-move detection without turn mutation;
+- the decided extra-roll direction for rolling `6`, with execution deferred to
+  GAME-108;
 - separation between logical and visual coordinates;
 - server-authoritative architecture boundaries.
 
-More advanced gameplay behavior remains intentionally deferred until its
-corresponding game-engine Jira Story is designed, implemented, tested, and
-accepted.
+Capture resolution, blockade policy, detailed extra-turn chains, turn timing,
+winner/ranking behavior, animation, and multiplayer execution remain deferred
+to their corresponding Jira Stories.
