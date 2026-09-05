@@ -38,7 +38,7 @@ class LegalMove {
 class LegalMoveResult {
   /// Creates a result from [moves].
   LegalMoveResult(Iterable<LegalMove> moves)
-    : moves = List<LegalMove>.unmodifiable(moves);
+      : moves = List<LegalMove>.unmodifiable(moves);
 
   /// Legal token choices in the same deterministic order as GameState.tokens.
   final List<LegalMove> moves;
@@ -47,9 +47,8 @@ class LegalMoveResult {
   bool get hasLegalMoves => moves.isNotEmpty;
 
   /// Stable token IDs that presentation may highlight.
-  List<String> get movableTokenIds => List<String>.unmodifiable(
-    moves.map((move) => move.tokenId),
-  );
+  List<String> get movableTokenIds =>
+      List<String>.unmodifiable(moves.map((move) => move.tokenId));
 
   /// Finds the legal move for [tokenId], or null when that token is not legal.
   LegalMove? moveForToken(String tokenId) {
