@@ -30,7 +30,10 @@ void main() {
       for (var diceValue = 1; diceValue <= 5; diceValue++) {
         test('dice $diceValue cannot release a yard token', () {
           final state = _state(DiceResult(diceValue), [_yardToken('red_0')]);
-          expect(evaluator.evaluate(state, PlayerColor.red).hasLegalMoves, isFalse);
+          expect(
+            evaluator.evaluate(state, PlayerColor.red).hasLegalMoves,
+            isFalse,
+          );
         });
       }
 
@@ -95,7 +98,10 @@ void main() {
 
       test('rejects a roll that overshoots finish', () {
         final state = _state(DiceResult(5), [_pathToken('red_0', 52)]);
-        expect(evaluator.evaluate(state, PlayerColor.red).hasLegalMoves, isFalse);
+        expect(
+          evaluator.evaluate(state, PlayerColor.red).hasLegalMoves,
+          isFalse,
+        );
       });
 
       test('finished token can never move again', () {
@@ -103,12 +109,18 @@ void main() {
           DiceResult(1),
           [_pathToken('red_0', TokenPosition.finishProgress)],
         );
-        expect(evaluator.evaluate(state, PlayerColor.red).hasLegalMoves, isFalse);
+        expect(
+          evaluator.evaluate(state, PlayerColor.red).hasLegalMoves,
+          isFalse,
+        );
       });
 
       test('unusable six does not move token needing four to finish', () {
         final state = _state(DiceResult(6), [_pathToken('red_0', 52)]);
-        expect(evaluator.evaluate(state, PlayerColor.red).hasLegalMoves, isFalse);
+        expect(
+          evaluator.evaluate(state, PlayerColor.red).hasLegalMoves,
+          isFalse,
+        );
       });
     });
 
@@ -124,16 +136,19 @@ void main() {
         );
       });
 
-      test('reports no legal moves when every owned token is blocked by rules', () {
-        final state = _state(DiceResult(3), [
-          _yardToken('red_yard'),
-          _pathToken('red_near_finish', 54),
-          _pathToken('red_finished', TokenPosition.finishProgress),
-        ]);
-        final result = evaluator.evaluate(state, PlayerColor.red);
-        expect(result.hasLegalMoves, isFalse);
-        expect(result.movableTokenIds, isEmpty);
-      });
+      test(
+        'reports no legal moves when every owned token is blocked by rules',
+        () {
+          final state = _state(DiceResult(3), [
+            _yardToken('red_yard'),
+            _pathToken('red_near_finish', 54),
+            _pathToken('red_finished', TokenPosition.finishProgress),
+          ]);
+          final result = evaluator.evaluate(state, PlayerColor.red);
+          expect(result.hasLegalMoves, isFalse);
+          expect(result.movableTokenIds, isEmpty);
+        },
+      );
 
       test('preserves GameState token order for deterministic choices', () {
         final state = _state(DiceResult(2), [
