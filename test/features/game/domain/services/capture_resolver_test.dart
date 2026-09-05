@@ -35,41 +35,38 @@ void main() {
       (color: PlayerColor.yellow, progress: 8),
       (color: PlayerColor.blue, progress: 8),
     ]) {
-      test(
-        'safe destination for ${safeCase.color.name} progress '
-        '${safeCase.progress} suppresses capture',
-        () {
-          final movedToken = _pathToken(
-            'mover',
-            safeCase.color,
-            safeCase.progress,
-          );
-          final physicalIndex = _mainTrackIndex(
-            safeCase.color,
-            safeCase.progress,
-          );
-          final opponentColor = _differentColor(safeCase.color);
-          final opponentProgress = _progressForMainTrackIndex(
-            opponentColor,
-            physicalIndex,
-          );
-          final movement = _movement(
-            movedToken: movedToken,
-            otherTokens: [
-              _pathToken('opponent', opponentColor, opponentProgress),
-            ],
-          );
+      test('safe destination for ${safeCase.color.name} progress '
+          '${safeCase.progress} suppresses capture', () {
+        final movedToken = _pathToken(
+          'mover',
+          safeCase.color,
+          safeCase.progress,
+        );
+        final physicalIndex = _mainTrackIndex(
+          safeCase.color,
+          safeCase.progress,
+        );
+        final opponentColor = _differentColor(safeCase.color);
+        final opponentProgress = _progressForMainTrackIndex(
+          opponentColor,
+          physicalIndex,
+        );
+        final movement = _movement(
+          movedToken: movedToken,
+          otherTokens: [
+            _pathToken('opponent', opponentColor, opponentProgress),
+          ],
+        );
 
-          final resolution = resolver.resolve(movement);
+        final resolution = resolver.resolve(movement);
 
-          expect(resolution.didCapture, isFalse);
-          expect(resolution.capturedTokenIds, isEmpty);
-          expect(
-            _token(resolution.gameState, 'opponent').position.progress,
-            opponentProgress,
-          );
-        },
-      );
+        expect(resolution.didCapture, isFalse);
+        expect(resolution.capturedTokenIds, isEmpty);
+        expect(
+          _token(resolution.gameState, 'opponent').position.progress,
+          opponentProgress,
+        );
+      });
     }
 
     test('same-color token on destination is not captured', () {
@@ -113,7 +110,10 @@ void main() {
 
       expect(resolution.capturedTokenIds, ['green_0', 'yellow_0']);
       expect(_token(resolution.gameState, 'green_0').position.isInYard, isTrue);
-      expect(_token(resolution.gameState, 'yellow_0').position.isInYard, isTrue);
+      expect(
+        _token(resolution.gameState, 'yellow_0').position.isInYard,
+        isTrue,
+      );
     });
 
     test('keeps friendly token while capturing opponent on same cell', () {
