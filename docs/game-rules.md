@@ -315,12 +315,12 @@ This gives:
 
 Tokens occupying a safe shared-track cell cannot be captured.
 
-Private home-lane cells and finish positions are inherently protected
-because opponents cannot legally occupy those routes.
+GAME-107 allows tokens of different players to coexist on a safe shared-track
+cell without capture. Same-color tokens may also share a cell. Shared-cell
+occupancy does not by itself create blockade behavior in GAME-107.
 
-Rules concerning multiple tokens occupying the same safe cell or possible
-blockade behavior are not defined by the logical board model and must be
-decided by the appropriate later game-rule Story.
+Private home-lane cells and finish positions are inherently protected because
+opponents cannot legally occupy the same player-private route.
 
 ---
 
@@ -609,6 +609,34 @@ state:
 GAME-106 does not resolve captures or blockades and does not decide bonus turns,
 current-player transitions, winner/ranking state, or multiplayer authority.
 
+## 12.3 GAME-107 Capture Resolution Rules
+
+GAME-107 resolves capture consequences only after GAME-106 has committed the
+moved token's final logical destination.
+
+- only occupancy of the moved token's final destination is evaluated; tokens on
+  intermediate movement cells are not captured;
+- on a non-safe shared-track destination, every opponent token occupying that
+  physical board cell is returned to its yard;
+- same-color tokens may coexist on one cell and are never captured by each
+  other;
+- if opponent tokens of multiple colors occupy the same capturable destination,
+  all of them are captured;
+- all eight configured safe shared-track cells suppress capture and allow
+  opponent tokens to coexist there;
+- private home lanes and finish positions cannot produce captures because they
+  are player-specific protected routes;
+- capture resolution creates a new immutable post-capture `GameState`; the
+  GAME-106 movement state and existing token objects are not mutated;
+- the post-capture logical state is authoritative before any impact or
+  return-to-yard presentation begins;
+- capture presentation may lock input while it plays but cannot determine,
+  cancel, or roll back the logical capture result.
+
+GAME-107 does not grant or execute a bonus turn. Same-cell occupancy does not
+create blockade semantics, and occupied intermediate cells do not block passage
+in GAME-107. Blockade policy remains deferred.
+
 ---
 
 # 13. Reference Gameplay Rules Identified
@@ -651,7 +679,7 @@ releases a token from the yard.
 
 The logical board model intentionally does not define every gameplay policy.
 
-Some movement rules were formally decided by GAME-105 and GAME-106 and are
+Movement and capture rules formally decided by GAME-105 through GAME-107 are
 recorded above. The following remaining policies still require explicit
 decisions or later implementation in their relevant Jira Stories.
 
@@ -703,25 +731,37 @@ Still to decide:
 
 ## 14.4 Capture Rules
 
-To decide:
+Decided by GAME-107:
 
-- normal capture behavior;
-- whether captured tokens return to the yard;
-- whether capture grants another roll/turn;
-- capture exceptions;
-- interaction between capture and safe cells.
+- capture is evaluated only at the mover's final destination;
+- every opponent token on the same non-safe shared-track cell is returned to
+  yard;
+- safe cells suppress capture;
+- same-color tokens may coexist without capture;
+- private home lanes and finish positions cannot capture;
+- capture animation has no logical authority.
+
+Still pending for turn-system work:
+
+- whether a capture grants another roll or turn.
 
 ---
 
 ## 14.5 Multiple Tokens and Blockades
 
-To decide:
+Decided by GAME-107:
 
-- whether multiple same-color tokens may occupy one cell;
-- whether stacked tokens create a blockade;
-- whether opponents may pass a blockade;
+- multiple same-color tokens may occupy one cell;
+- stacking alone does not create blockade behavior in GAME-107;
+- occupied intermediate cells do not block movement in GAME-107.
+
+Still to decide:
+
+- whether a future mode introduces blockades;
+- if so, how many tokens create one;
+- whether opponents may pass or land on a blockade;
 - whether blockades may exist on safe cells;
-- how blockades interact with movement.
+- how blockade legality integrates with legal-move evaluation.
 
 ---
 
@@ -824,10 +864,9 @@ Animation must never determine logical game results.
 
 For example:
 
-A token movement animation visualizes an already-determined logical
-movement.
-
-The animation itself must never determine where the token finishes.
+A token movement or capture animation visualizes an already-determined logical
+state change. The animation itself must never determine where a token finishes
+or whether an opponent is captured.
 
 ---
 
@@ -929,11 +968,17 @@ The current authoritative scope primarily covers:
 - ordered movement-step plans used only for presentation sequencing;
 - presentation interruption cannot redefine or roll back committed logical
   movement;
+- final-destination capture resolution on non-safe shared-track cells;
+- safe-cell coexistence without capture;
+- capture of every opponent token sharing a capturable destination;
+- same-color stacking without blockade semantics;
+- immutable post-capture state committed before capture presentation;
+- capture presentation/input locking without logical authority;
 - the decided extra-roll direction for rolling `6`, with execution deferred to
   GAME-108;
 - separation between logical and visual coordinates;
 - server-authoritative architecture boundaries.
 
-Capture resolution, blockade policy, detailed extra-turn chains, turn timing,
-winner/ranking behavior, and multiplayer execution remain deferred to their
-corresponding Jira Stories.
+Bonus-turn execution after capture, blockade policy, detailed extra-turn chains,
+turn timing, winner/ranking behavior, and multiplayer execution remain deferred
+to their corresponding Jira Stories.
